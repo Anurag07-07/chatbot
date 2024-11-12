@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech-to-Speech Chatbot</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <video src="./image/215500.mp4" autoplay loop muted class="background-clip"></video>
+    <div class="container">
+        <h1>INTERVIEW BOT(BETA)</h1>
+        <div class="header">
+            <img src="./image/istockphoto-543190650-1024x1024-removebg-preview.png" alt="">
+            <!-- <h3>Use Headphone For Better Experience</h3>
+            <h3>Q0 :Ask me coding question related to DSA with constraints Input and Output in Code Format EX:ask me coding question related to DSA in binary search trees</h3>
+            <h3>Q1 :You as a Mock Interviewer Ask Me 5 Question Realted to "Tech Stack Name Like Java Javascript React etc..."</h3>
+            <h3>Q2 :Ask Me 5 Coding Questions where i have give output as an answer related to Java or any othertech stack</h3>
+            <h3>Q3 :Take A Behaviour Mock Interview and Ask Question related to That</h3>
+            <h3>Q4 :As an interviewer ask me one DSA question on graph</h3>
+            <h2>Try New Questions Also As this has Some Technical Error we Improve them in Upcoming Future</h2> -->
+        </div>
+        <div class="chatbox">
+            <div id="chat-output" class="chat-output"></div>
+            <div class="input-container">
+                <input type="text" id="userInput" placeholder="Type here" class="chat-input" />
+                <button id="startButton" class="button">Start Listening</button>
+                <button id="sendButton" class="button">Send Message</button>
+                <button id="stopButton" class="button">Stop Speech</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const startButton = document.getElementById('startButton');
+        const sendButton = document.getElementById('sendButton');
+        const stopButton = document.getElementById('stopButton');
+        const userInput = document.getElementById('userInput');
+        const chatOutput = document.getElementById('chat-output');
+
+        // Web Speech API: Speech Recognition
+        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.lang = 'en-US';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        let isRecognizing = false;
+
+        startButton.addEventListener('click', () => {
+            if (!isRecognizing) {
+                recognition.start();
+                startButton.textContent = "Listening...";
+                stopButton.disabled = false;
+                isRecognizing = true;
+            }
+        });
+
+        recognition.onresult = async (event) => {
+            let transcript = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                transcript += event.results[i][0].transcript;
+            }
+            userInput.value = transcript;
+
+            if (event.results[event.results.length - 1].isFinal) {
+                const message = transcript.trim();
+                chatOutput.innerHTML += `<div class="user-message">You: ${message}</div>`;
+
+                // Automatically send message to the server
+                const response = await fetch('/chatbot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: message }),
+                });
+
+                const data = await response.json();
+                const botResponse = data.botResponse;
+                chatOutput.innerHTML += `<div class="bot-message">Bot: ${botResponse}</div>`;
+                chatOutput.scrollTop = chatOutput.scrollHeight;
+
+                // Speech synthesis only for the bot's response
+                const speechUtterance = new SpeechSynthesisUtterance(botResponse);
+                speechSynthesis.speak(speechUtterance);
+            }
+        };
+
+        recognition.onerror = (event) => {
+            console.error(event.error);
+        };
+
+        sendButton.addEventListener('click', async () => {
+    const message = userInput.value;
+    if (!message) return;
+
+    chatOutput.innerHTML += `<div class="user-message">You: ${message}</div>`;
+
+    try {
+        const response = await fetch('/chatbot', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: message }),
+        });
+
+        const data = await response.json();
+        let botResponse = data.botResponse;
+
+        // Remove asterisks (*), hashtags (#), colons (:), and the sequence "039"
+        botResponse = botResponse.replace(/[*#:]/g, ''); // Remove *, #, and :
+        botResponse = botResponse.replace(/039/g, '');  // Remove 039
+
+        // Decode HTML entities to make sure the response is clean
+        botResponse = decodeHtml(botResponse);
+
+        // Check if the response is a code snippet
+        if (botResponse.match(/```[\s\S]*?```/)) {
+            botResponse = `<pre><code>${botResponse.replace(/```/g, '')}</code></pre>`;
+        } else {
+            botResponse = `<div class="bot-message">Bot: ${botResponse}</div>`;
+        }
+
+        chatOutput.innerHTML += botResponse;
+        chatOutput.scrollTop = chatOutput.scrollHeight;
+
+        // Speech synthesis for the bot's response
+        const speechUtterance = new SpeechSynthesisUtterance(botResponse);
+        speechSynthesis.speak(speechUtterance);
+    } catch (error) {
+        console.error('Error with bot response:', error);
+        chatOutput.innerHTML += `<div class="bot-message">Bot: Sorry, something went wrong.</div>`;
+    }
+});
+
+// Function to decode HTML entities back to their original characters
+function decodeHtml(text) {
+    const textArea = document.createElement('textarea');
+    textArea.innerHTML = text;
+    return textArea.value;
+}
+
+
+// Function to decode HTML entities back to their original characters
+function decodeHtml(text) {
+    const textArea = document.createElement('textarea');
+    textArea.innerHTML = text;
+    return textArea.value;
+}
+
+
+        stopButton.addEventListener('click', () => {
+            speechSynthesis.cancel();
+            chatOutput.innerHTML += `<div class="bot-message">Bot: Speech stopped. Please ask the next question.</div>`;
+            chatOutput.scrollTop = chatOutput.scrollHeight;
+            recognition.stop();
+            isRecognizing = false;
+            startButton.textContent = "Start Listening";
+        });
+    </script>
+    <script src="../app.js"></script>
+</body>
+</html>
